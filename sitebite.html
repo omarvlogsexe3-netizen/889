@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shopping Links — Cards</title>
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #ffffff;
+    color: #111827;
+  }
+
+  .page {
+    padding: 16px 20px 24px;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin: 0 0 12px 0;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 12px;
+  }
+
+  .controls {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .controls button,
+  .controls select {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+  }
+
+  .controls button.primary {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+
+  .controls button.primary:hover {
+    background: #dc2626;
+  }
+
+  .controls button.secondary {
+    background: #555;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+
+  .controls button.secondary:hover {
+    background: #444;
+  }
+
+  .controls select {
+    background: #f5f5f5;
+  }
+
+  .cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .card {
+    flex: 1 1 280px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.7);
+    transform: translateY(-2px);
+  }
+
+  .card-header {
+    padding: 8px 10px;
+    background: #f8f8f8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-radius: 11px 11px 0 0;
+  }
+
+  .card-header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .card-header h2[contenteditable="true"] {
+    outline: none;
+  }
+
+  .category-label {
+    display: block;
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  .delete-btn {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: center;
+    line-height: 20px;
+  }
+
+  .card-content {
+    display: none;
+    padding: 10px 12px 12px;
+    border-radius: 0 0 11px 11px;
+  }
+
+  .card.open .card-content {
+    display: block;
+  }
+
+  label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 12px;
+  }
+
+  select:focus, input:focus {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.1);
+    outline: none;
+  }
+
+  .open-link-row {
+    margin-top: 6px;
+  }
+
+  .open-link-row a {
+    font-size: 13px;
+    color: #ef4444;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .open-link-row a:hover {
+    text-decoration: underline;
+  }
+
+  .empty {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  @media (max-width: 640px) {
+    .card {
+      flex: 1 1 100%;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Shopping Links — Cards</h1>
+  <div class="subtitle">Links stored locally in this browser only.</div>
+
+  <div class="controls">
+    <button id="addLinkBtn" class="primary">+ Add Link</button>
+    <button id="clearAllBtn" class="secondary">Clear All</button>
+    <select id="filterSelect"></select>
+    <button id="addCategoryBtn">+ Category</button>
+    <button id="deleteCategoryBtn">Delete Category</button>
+  </div>
+
+  <div id="cardsContainer" class="cards"></div>
+  <div id="emptyState" class="empty" style="display:none;">No links yet. Add one above.</div>
+</div>
+
+<script>
+(function () {
+  const LINKS_KEY = "shoppingLinks_cards_v3";
+  const CATS_KEY  = "shoppingLinks_categories_v3";
+
+  let links = [];
+  let categories = [];
+  let activeFilter = "All"; // "All", "__uncat", or a category name
+
+  const addLinkBtn        = document.getElementById("addLinkBtn");
+  const clearAllBtn       = document.getElementById("clearAllBtn");
+  const addCategoryBtn    = document.getElementById("addCategoryBtn");
+  const deleteCategoryBtn = document.getElementById("deleteCategoryBtn");
+  const filterSelect      = document.getElementById("filterSelect");
+  const cardsContainer    = document.getElementById("cardsContainer");
+  const emptyState        = document.getElementById("emptyState");
+
+  function makeId() {
+    return Date.now() + "-" + Math.random().toString(36).slice(2);
+  }
+
+  function save() {
+    localStorage.setItem(LINKS_KEY, JSON.stringify(links));
+    localStorage.setItem(CATS_KEY, JSON.stringify(categories));
+  }
+
+  function load() {
+    try {
+      links      = JSON.parse(localStorage.getItem(LINKS_KEY) || "[]");
+      categories = JSON.parse(localStorage.getItem(CATS_KEY)  || "[]");
+    } catch (e) {
+      links = [];
+      categories = [];
+    }
+
+    // If no categories stored (old data), derive from links once
+    if (!categories.length && links.length) {
+      const set = new Set();
+      links.forEach(l => { if (l.category) set.add(l.category); });
+      categories = Array.from(set);
+    }
+    categories.sort((a,b) => a.localeCompare(b));
+  }
+
+  function ensureHttp(url) {
+    if (!url) return "";
+    return /^https?:\/\//i.test(url) ? url : "https://" + url;
+  }
+
+  function renderFilter() {
+    filterSelect.innerHTML = "";
+
+    const allOpt = document.createElement("option");
+    allOpt.value = "All";
+    allOpt.textContent = "All";
+    filterSelect.appendChild(allOpt);
+
+    const uncatOpt = document.createElement("option");
+    uncatOpt.value = "__uncat";
+    uncatOpt.textContent = "Uncategorized";
+    filterSelect.appendChild(uncatOpt);
+
+    categories.forEach(cat => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      filterSelect.appendChild(opt);
+    });
+
+    if (!["All","__uncat",...categories].includes(activeFilter)) {
+      activeFilter = "All";
+    }
+    filterSelect.value = activeFilter;
+  }
+
+  function renderCards() {
+    cardsContainer.innerHTML = "";
+
+    let filtered = links.slice();
+    if (activeFilter === "__uncat") {
+      filtered = filtered.filter(l => !l.category);
+    } else if (activeFilter !== "All") {
+      filtered = filtered.filter(l => l.category === activeFilter);
+    }
+
+    emptyState.style.display = filtered.length ? "none" : "block";
+
+    filtered.forEach(link => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const displayTitle = link.title || "New Item";
+      const displayCat   = link.category || "Uncategorized";
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div>
+            <h2 contenteditable="true">${displayTitle}</h2>
+            <span class="category-label">${displayCat}</span>
+          </div>
+          <button class="delete-btn">×</button>
+        </div>
+        <div class="card-content">
+          <label>Category</label>
+          <select data-field="category"></select>
+
+          <label>URL</label>
+          <input data-field="url" value="${link.url || ""}">
+
+          <div class="open-link-row">
+            <a href="${ensureHttp(link.url)}" target="_blank" rel="noopener noreferrer">Open link</a>
+          </div>
+        </div>
+      `;
+
+      const header         = card.querySelector(".card-header");
+      const deleteBtn      = card.querySelector(".delete-btn");
+      const titleEl        = card.querySelector("h2");
+      const categoryLabel  = card.querySelector(".category-label");
+      const categorySelect = card.querySelector('select[data-field="category"]');
+      const urlInput       = card.querySelector('input[data-field="url"]');
+      const openLinkAnchor = card.querySelector(".open-link-row a");
+
+      // Build category dropdown (Uncategorized + existing)
+      categorySelect.innerHTML = "";
+      const uncatOption = document.createElement("option");
+      uncatOption.value = "";
+      uncatOption.textContent = "Uncategorized";
+      categorySelect.appendChild(uncatOption);
+
+      categories.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+      });
+
+      categorySelect.value = link.category || "";
+
+      // Title edit
+      titleEl.addEventListener("blur", () => {
+        link.title = titleEl.innerText.trim() || "New Item";
+        save();
+      });
+
+      titleEl.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          titleEl.blur();
+        }
+      });
+
+      // Expand / collapse
+      header.addEventListener("click", e => {
+        if (e.target === deleteBtn || e.target === titleEl) return;
+        card.classList.toggle("open");
+      });
+
+      // Delete link
+      deleteBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        if (!confirm("Delete this link?")) return;
+        links = links.filter(l => l.id !== link.id);
+        save();
+        renderAll();
+      });
+
+      // Category change (no creation here)
+      categorySelect.addEventListener("change", () => {
+        link.category = categorySelect.value;
+        categoryLabel.textContent = link.category || "Uncategorized";
+        save();
+        renderCards(); // refilter if needed
+      });
+
+      // URL change
+      urlInput.addEventListener("change", () => {
+        link.url = urlInput.value.trim();
+        openLinkAnchor.href = ensureHttp(link.url);
+        save();
+      });
+
+      cardsContainer.appendChild(card);
+    });
+  }
+
+  function renderAll() {
+    renderFilter();
+    renderCards();
+  }
+
+  // Top controls
+  addLinkBtn.addEventListener("click", () => {
+    links.push({ id: makeId(), title: "New Item", url: "", category: "" });
+    save();
+    renderAll();
+  });
+
+  clearAllBtn.addEventListener("click", () => {
+    if (!links.length) return;
+    if (!confirm("Delete ALL links?")) return;
+    links = [];
+    save();
+    renderAll();
+  });
+
+  addCategoryBtn.addEventListener("click", () => {
+    const name = prompt("New category name:");
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (["All","Uncategorized","__uncat"].includes(trimmed)) {
+      alert("This name is reserved.");
+      return;
+    }
+    if (categories.includes(trimmed)) {
+      alert("Category already exists.");
+      return;
+    }
+    categories.push(trimmed);
+    categories.sort((a,b)=>a.localeCompare(b));
+    save();
+    renderAll();
+  });
+
+  deleteCategoryBtn.addEventListener("click", () => {
+    const val = filterSelect.value;
+    if (val === "All" || val === "__uncat") {
+      alert("Select a specific category to delete.");
+      return;
+    }
+    if (!categories.includes(val)) return;
+    if (!confirm(`Delete category "${val}"? Items in it will become 'Uncategorized'.`)) return;
+
+    // Items move to Uncategorized
+    links.forEach(l => {
+      if (l.category === val) l.category = "";
+    });
+
+    // Remove category
+    categories = categories.filter(c => c !== val);
+    activeFilter = "All";
+    save();
+    renderAll();
+  });
+
+  filterSelect.addEventListener("change", () => {
+    activeFilter = filterSelect.value;
+    renderCards();
+  });
+
+  // Init
+  load();
+  renderAll();
+})();
+</script>
+</body>
+</html>
